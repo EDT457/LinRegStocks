@@ -9,9 +9,10 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.ml.regression.LinearRegression
+import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel}
 import org.apache.spark.ml.Pipeline
 
-object VolatilityByEmployees {
+object industries {
   def main(args: Array[String]): Unit = {
     Logger.getLogger("org").setLevel(Level.OFF)
     Logger.getLogger("akka").setLevel(Level.OFF)
@@ -21,21 +22,28 @@ object VolatilityByEmployees {
       .master("local[*]")
       .getOrCreate()
 
-    val data = spark.read.option("header", "true").option("inferSchema", "true").csv("src/sp500_stocks.csv")
+    val sectors = spark.read.option("header", "true").option("inferSchema", "true").csv("src/sp500_companies.csv")
+    val stocks = spark.read.option("header", "true").option("inferSchema", "true").csv("src/sp500_stocks.csv")
 
     // Select columns and cast them to the correct data types
-    val df = data.select(
-      col("Date").cast("date"),
-      col("Symbol"),
-      col("Sector"),
-      col("High").cast("double"),
-      col("Low").cast("double"),
-      col("Close").cast("double"),
+    val df1 = sectors.select(
+      col("Symbol").cast("String"),
       col("Fulltimeemployees").cast("double")
     )
 
+    val df2 = stocks.select(
+      col("Date").cast("date"),
+      col("High").cast("double"),
+      col("Low").cast("double"),
+      col("Close").cast("double"),
+      col("Symbol").cast("String")
+    )
+
+    val joinedDF = df2.join(df1, "Symbol")
+    val cleanDF = joinedDF.na.drop(Seq("Fulltimeemployees"))
+
     // Calculate daily volatility for each stock
-    val dailyVolatility = df.withColumn("DailyVolatility", (col("High") - col("Low")) / col("Close") * 100)
+    val dailyVolatility = cleanDF.withColumn("DailyVolatility", (col("High") - col("Low")) / col("Close") * 100)
 
     // Calculate overall volatility for each stock
     val stockVolatility = dailyVolatility.groupBy("Symbol", "Fulltimeemployees")
