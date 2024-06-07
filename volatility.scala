@@ -30,11 +30,12 @@ object volatility {
       col("Date").cast("date"),
       col("Symbol"),
       col("High").cast("double"),
-      col("Low").cast("double")
+      col("Low").cast("double"),
+      col("Close").cast("double")
     )
 
     // Calculate daily volatility for each stock
-    val dailyVolatility = df.withColumn("DailyVolatility", col("High") - col("Low"))
+    val dailyVolatility = df.withColumn("DailyVolatility", (col("High") - col("Low")) / col("Close") * 100)
 
     // Calculate overall volatility for each stock
     val stockVolatility = dailyVolatility.groupBy("Symbol")
